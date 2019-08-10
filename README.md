@@ -11,12 +11,12 @@ you can do the following commands in a terminal from any directory:
 ```
 git clone https://github.com/cadelaney3/jsondiff
 cd jsondiff
-go run <file1.json> <file2.json>
+go run main.go <file1.json> <file2.json>
 ```
 You can also run from the terminal:
 
 ```
 go get github.com/cadelaney3/jsondiff
 cd $GOPATH/src/github.com/cadelaney3/jsondiff
-go run <file1.json> <file2.json>
+go run main.go <file1.json> <file2.json>
 ```
