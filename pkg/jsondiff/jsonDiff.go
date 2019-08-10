@@ -51,9 +51,7 @@ func FindKeys(file File) map[string]*Key {
 }
 
 // findKeysHelper uses recursion to go thru keys of JSON and store the data for each key
-func findKeysHelper(data map[string]*Key, parent string, jsonItem interface{}) []string {
-	// keys slice will keep track of the keys encountered at next level down or values if there is no lower level
-	keys := make([]string, 0)
+func findKeysHelper(data map[string]*Key, parent string, jsonItem interface{}) {
 	// initial children map of parent item
 	if data[parent].Children == nil {
 		data[parent].Children = make(map[string]int)
@@ -69,52 +67,35 @@ func findKeysHelper(data map[string]*Key, parent string, jsonItem interface{}) [
 	case map[string]interface{}:
 		for k, v := range jsonItem.(map[string]interface{}) {
 			k = strings.ToLower(k)
+
 			// increment this child for the parent key
 			data[parent].Children[k]++
+
 			// if this key does not exist, initialize
 			if _, ok := data[k]; !ok {
 				data[k] = &Key{ Name: k }
 			}
-			// initialize parent map for this key if nil
+
 			if data[k].Parent == nil {
 				data[k].Parent = make(map[string]int)
 			}
+
 			// increment the parent for this key
 			data[k].Parent[parent]++
+
 			// increment times this key has appeared
 			data[k].Count++
 
-			keys = append(keys, k)
-			// recursive call to go down a level in JSON, which will return the keys of next level down
-			t := findKeysHelper(data, k, v)
-			if t != nil {
-				if data[k].Children == nil {
-					data[k].Children = make(map[string]int)
-				}
-				// for each child key in next level down, put in child map of this key
-				for _, c := range t {
-					// if the child exists in data map (should due to earlier recursive call) 
-					// and the current key (k) is not a parent of child, break to avoid having a 
-					// grandparent show up in the child's parent map
-					if _, ok := data[c].Parent[k]; !ok {
-						break
-					}
-					// check to see if current key's parent has higher count than key's child.
-					// If so, we know we can increment child count, or else we might get a double
-					// count from recursive calls
-					if data[k].Parent[parent] > data[k].Children[c] {
-						data[k].Children[c]++
-					}
-				}
-			}
+			// recursive call to go down a level in JSON
+			findKeysHelper(data, k, v)
 		}
-		return keys
-
+		
 	// these are for final values (have no lower levels). Add these values as children to parent keys
 	case string:
 		temp := strings.ToLower(jsonItem.(string))
 		if _, ok := data[temp]; ok {
 			data[temp].Parent[parent]++
+			data[temp].Count++
 		}
 		data[parent].Children[temp]++
 		break
@@ -123,6 +104,7 @@ func findKeysHelper(data map[string]*Key, parent string, jsonItem interface{}) [
 		temp := strings.ToLower(strconv.FormatBool(jsonItem.(bool)))
 		if _, ok := data[temp]; ok {
 			data[temp].Parent[parent]++
+			data[temp].Count++
 		}
 		data[parent].Children[temp]++
 		break
@@ -149,9 +131,8 @@ func findKeysHelper(data map[string]*Key, parent string, jsonItem interface{}) [
 		break
 
 	default:
-		return nil
+		break
 	}
-	return nil
 }
 
 // Compare returns a score that is calculated by diving the total number of keys and final values of each JSON
@@ -162,22 +143,28 @@ func Compare(dat1 map[string]*Key, dat2 map[string]*Key) float64 {
 	dat2Count := 0
 	sameCount := 0.0
 	for k, v := range dat1 {
-		// if parent map is nil or empty, top level key so get how many times it appears.
-		if v.Parent == nil || len(v.Parent) == 0 {
-			dat1Count += v.Count
+
+		// get the data counts from each count in key, parent map, and child map
+		dat1Count += v.Count
+		for _, val := range v.Parent {
+			dat1Count += val
 		}
-		// rest of keys and final values can be counted from the counts in the child maps of each key
 		for _, val := range v.Children {
 			dat1Count += val
 		}
+
 		// check if key exists in both data maps
 		if v2, ok := dat2[k]; ok {
-			// if both parent maps empty for each key, add the min of the count the key appears
-			// to count how many times the JSONs are the same, in this case 
-			if (v.Parent == nil || len(v.Parent) == 0) && (v2.Parent == nil || len(v2.Parent) == 0) {
-				sameCount += math.Min(float64(v.Count), float64(v2.Count))
+
+			sameCount += math.Min(float64(v.Count), float64(v2.Count))
+
+			for key, val := range v.Parent {
+				if _, ok := v2.Parent[key]; ok {
+					// add min of the parents that are the same to sameCount
+					sameCount += math.Min(float64(val), float64(v2.Parent[key]))
+				}
 			}
-			
+
 			for key, val := range v.Children {
 				if _, ok := v2.Children[key]; ok {
 					// add min of the children that are the same to sameCount
@@ -186,10 +173,12 @@ func Compare(dat1 map[string]*Key, dat2 map[string]*Key) float64 {
 			}
 		}
 	}
-	// get the total count of keys and final values of other data map
+
+	// get the data count for the other json
 	for _, v := range dat2 {
-		if v.Parent == nil || len(v.Parent) == 0 {
-			dat2Count += v.Count
+		dat2Count += v.Count
+		for _, val := range v.Parent {
+			dat2Count += val
 		}
 		for _, val := range v.Children {
 			dat2Count += val
