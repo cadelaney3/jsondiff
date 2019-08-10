@@ -23,19 +23,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	if jsondiff.CheckExactEquals(files[0], files[1]) {
-		fmt.Printf("%.1f\n", 1.0)
-		return
-	}
-
 	jsonFiles, err := jsondiff.LoadJSON(files)
 	if err != nil {
 		panic(err)
-	}
-
-	if jsondiff.CheckDeepEquals(jsonFiles[0], jsonFiles[1]) {
-		fmt.Printf("%.2f\n", 0.99)
-		return
 	}
 
 	var f1, f2 jsondiff.File
@@ -48,11 +38,25 @@ func main() {
 		panic(err)
 	}
 
+	fmt.Print("Score ranges between 0.0 and 1.0. Lower scores indicate greater difference \n" +
+	"(0.0 completely different) and higher scores greater similarity (1.0 exactly equal).\n\n")
+
+	if jsondiff.CheckExactEquals(files[0], files[1]) {
+		fmt.Printf("Score: %.1f\nFiles are exactly the same\n", 1.0)
+		return
+	}
+
+	if jsondiff.CheckDeepEquals(jsonFiles[0], jsonFiles[1]) {
+		fmt.Printf("Score: %.2f\nSame content, different order\n", 0.99)
+		return
+	}
+
 	data1 := jsondiff.FindKeys(f1)
 	data2 := jsondiff.FindKeys(f2)
 
 	result := jsondiff.Compare(data1, data2)
-	fmt.Println(result)
+
+	fmt.Println("Score: ", result)
 }
 
 func readFiles(paths []string) ([][]byte, error) {
